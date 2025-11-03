@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="sv">
 <head>
-  <meta charset="UTF-8">
-  <title>Curlingbo med Stoppklocka</title>
+  <meta charset="UTF-8" />
+  <title>Curlingträning – Analysverktyg</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -17,7 +17,6 @@
       color: #003366;
     }
 
-    /* Klocka */
     #clock {
       font-size: 32px;
       margin: 10px 0;
@@ -25,7 +24,6 @@
       color: #222;
     }
 
-    /* Curlingboet */
     .bo {
       position: relative;
       margin: 20px auto;
@@ -33,7 +31,7 @@
       height: 500px;
       border-radius: 50%;
       background: white;
-      box-shadow: 0 0 20px rgba(0,0,0,0.2);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
       overflow: hidden;
     }
 
@@ -47,10 +45,9 @@
 
     .blue { width: 500px; height: 500px; background: #0077cc; }
     .white { width: 350px; height: 350px; background: #ffffff; }
-    .red   { width: 200px; height: 200px; background: #cc0000; }
+    .red { width: 200px; height: 200px; background: #cc0000; }
     .button { width: 100px; height: 100px; background: #ffffff; }
 
-    /* Stenar */
     .stone {
       position: absolute;
       width: 30px;
@@ -63,10 +60,7 @@
     .stone.red { background: red; }
     .stone.yellow { background: gold; }
 
-    /* Panel */
-    .panel {
-      margin-top: 20px;
-    }
+    .panel { margin-top: 20px; }
 
     .mini-stone {
       width: 20px;
@@ -77,9 +71,7 @@
       border: 1px solid #000;
       opacity: 1;
     }
-    .mini-stone.used {
-      opacity: 0.2;
-    }
+    .mini-stone.used { opacity: 0.2; }
     .mini-red { background: red; }
     .mini-yellow { background: gold; }
 
@@ -93,21 +85,33 @@
       background: #0077cc;
       color: white;
     }
-    button:hover {
-      background: #005fa3;
+    button:hover { background: #005fa3; }
+
+    table {
+      margin: 20px auto;
+      border-collapse: collapse;
+      width: 80%;
+      background: white;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 8px;
+    }
+    th {
+      background: #003366;
+      color: white;
     }
   </style>
 </head>
 <body>
-  <h1>Curlingträning</h1>
+  <h1>Curlingträning – Analysverktyg</h1>
 
-  <!-- Stoppklocka -->
   <div id="clock">00:00.00</div>
   <button onclick="startPause()">Start/Paus</button>
   <button onclick="resetClock()">Återställ klocka</button>
   <button onclick="resetBo()">Rensa bo</button>
+  <button onclick="exportData()">Exportera data (CSV)</button>
 
-  <!-- Curlingbo -->
   <div class="bo" id="bo">
     <div class="ring blue"></div>
     <div class="ring white"></div>
@@ -115,17 +119,27 @@
     <div class="ring button"></div>
   </div>
 
-  <!-- Panel för stenar -->
   <div class="panel">
     <h3>Kvarvarande stenar</h3>
     <div id="redPanel"></div>
     <div id="yellowPanel"></div>
   </div>
 
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Lag</th>
+        <th>X-position</th>
+        <th>Y-position</th>
+        <th>Tid (sek)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
   <script>
-    // -----------------------------
     // Stoppklocka
-    // -----------------------------
     let startTime = 0;
     let elapsedTime = 0;
     let timerInterval;
@@ -162,19 +176,17 @@
       document.getElementById("clock").textContent = "00:00.00";
     }
 
-    // -----------------------------
-    // Curlingbo och stenar
-    // -----------------------------
+    // Curlingbo
     const bo = document.getElementById("bo");
     const redPanel = document.getElementById("redPanel");
     const yellowPanel = document.getElementById("yellowPanel");
+    const dataTable = document.getElementById("dataTable").querySelector("tbody");
 
     let stones = [];
     let redCount = 0;
     let yellowCount = 0;
     const maxStones = 8;
 
-    // Skapa ministenar i panelen
     for (let i = 0; i < maxStones; i++) {
       const r = document.createElement("div");
       r.classList.add("mini-stone", "mini-red");
@@ -211,6 +223,12 @@
 
       bo.appendChild(stone);
       stones.push(stone);
+
+      const timeSec = ((elapsedTime + (running ? Date.now() - startTime : 0)) / 1000).toFixed(2);
+
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${stones.length}</td><td>${color}</td><td>${x.toFixed(1)}</td><td>${y.toFixed(1)}</td><td>${timeSec}</td>`;
+      dataTable.appendChild(row);
     });
 
     function resetBo() {
@@ -220,6 +238,21 @@
       yellowCount = 0;
       [...redPanel.children].forEach(c => c.classList.remove("used"));
       [...yellowPanel.children].forEach(c => c.classList.remove("used"));
+      dataTable.innerHTML = "";
+    }
+
+    function exportData() {
+      let csv = "#;Lag;X;Y;Tid (sek)\n";
+      document.querySelectorAll("#dataTable tbody tr").forEach(row => {
+        const cols = [...row.children].map(td => td.innerText);
+        csv += cols.join(";") + "\n";
+      });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "curlingdata.csv";
+      link.click();
     }
   </script>
 </body>
