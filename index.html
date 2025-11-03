@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>Curlingbo med Stoppklocka</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #e6f2ff;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1 {
+      margin: 20px;
+      color: #003366;
+    }
+
+    /* Klocka */
+    #clock {
+      font-size: 32px;
+      margin: 10px 0;
+      font-weight: bold;
+      color: #222;
+    }
+
+    /* Curlingboet */
+    .bo {
+      position: relative;
+      margin: 20px auto;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 0 20px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .blue { width: 500px; height: 500px; background: #0077cc; }
+    .white { width: 350px; height: 350px; background: #ffffff; }
+    .red   { width: 200px; height: 200px; background: #cc0000; }
+    .button { width: 100px; height: 100px; background: #ffffff; }
+
+    /* Stenar */
+    .stone {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 2px solid #333;
+      transform: translate(-50%, -50%);
+    }
+
+    .stone.red { background: red; }
+    .stone.yellow { background: gold; }
+
+    /* Panel */
+    .panel {
+      margin-top: 20px;
+    }
+
+    .mini-stone {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: inline-block;
+      margin: 3px;
+      border: 1px solid #000;
+      opacity: 1;
+    }
+    .mini-stone.used {
+      opacity: 0.2;
+    }
+    .mini-red { background: red; }
+    .mini-yellow { background: gold; }
+
+    button {
+      margin: 10px;
+      padding: 10px 15px;
+      font-size: 14px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #0077cc;
+      color: white;
+    }
+    button:hover {
+      background: #005fa3;
+    }
+  </style>
+</head>
+<body>
+  <h1>Curlingträning</h1>
+
+  <!-- Stoppklocka -->
+  <div id="clock">00:00.00</div>
+  <button onclick="startPause()">Start/Paus</button>
+  <button onclick="resetClock()">Återställ klocka</button>
+  <button onclick="resetBo()">Rensa bo</button>
+
+  <!-- Curlingbo -->
+  <div class="bo" id="bo">
+    <div class="ring blue"></div>
+    <div class="ring white"></div>
+    <div class="ring red"></div>
+    <div class="ring button"></div>
+  </div>
+
+  <!-- Panel för stenar -->
+  <div class="panel">
+    <h3>Kvarvarande stenar</h3>
+    <div id="redPanel"></div>
+    <div id="yellowPanel"></div>
+  </div>
+
+  <script>
+    // -----------------------------
+    // Stoppklocka
+    // -----------------------------
+    let startTime = 0;
+    let elapsedTime = 0;
+    let timerInterval;
+    let running = false;
+
+    function updateClock() {
+      const time = Date.now() - startTime + elapsedTime;
+      const minutes = Math.floor(time / 60000);
+      const seconds = Math.floor((time % 60000) / 1000);
+      const hundredths = Math.floor((time % 1000) / 10);
+      document.getElementById("clock").textContent =
+        (minutes < 10 ? "0" : "") + minutes + ":" +
+        (seconds < 10 ? "0" : "") + seconds + "." +
+        (hundredths < 10 ? "0" : "") + hundredths;
+    }
+
+    function startPause() {
+      if (!running) {
+        startTime = Date.now();
+        timerInterval = setInterval(updateClock, 10);
+        running = true;
+      } else {
+        clearInterval(timerInterval);
+        elapsedTime += Date.now() - startTime;
+        running = false;
+      }
+    }
+
+    function resetClock() {
+      clearInterval(timerInterval);
+      startTime = 0;
+      elapsedTime = 0;
+      running = false;
+      document.getElementById("clock").textContent = "00:00.00";
+    }
+
+    // -----------------------------
+    // Curlingbo och stenar
+    // -----------------------------
+    const bo = document.getElementById("bo");
+    const redPanel = document.getElementById("redPanel");
+    const yellowPanel = document.getElementById("yellowPanel");
+
+    let stones = [];
+    let redCount = 0;
+    let yellowCount = 0;
+    const maxStones = 8;
+
+    // Skapa ministenar i panelen
+    for (let i = 0; i < maxStones; i++) {
+      const r = document.createElement("div");
+      r.classList.add("mini-stone", "mini-red");
+      redPanel.appendChild(r);
+
+      const y = document.createElement("div");
+      y.classList.add("mini-stone", "mini-yellow");
+      yellowPanel.appendChild(y);
+    }
+
+    bo.addEventListener("click", e => {
+      const rect = bo.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      let color;
+      if (redCount <= yellowCount && redCount < maxStones) {
+        color = "red";
+        redCount++;
+        redPanel.children[redCount - 1].classList.add("used");
+      } else if (yellowCount < maxStones) {
+        color = "yellow";
+        yellowCount++;
+        yellowPanel.children[yellowCount - 1].classList.add("used");
+      } else {
+        alert("Alla stenar är använda!");
+        return;
+      }
+
+      const stone = document.createElement("div");
+      stone.classList.add("stone", color);
+      stone.style.left = x + "px";
+      stone.style.top = y + "px";
+
+      bo.appendChild(stone);
+      stones.push(stone);
+    });
+
+    function resetBo() {
+      stones.forEach(s => s.remove());
+      stones = [];
+      redCount = 0;
+      yellowCount = 0;
+      [...redPanel.children].forEach(c => c.classList.remove("used"));
+      [...yellowPanel.children].forEach(c => c.classList.remove("used"));
+    }
+  </script>
+</body>
+</html>
