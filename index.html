@@ -125,6 +125,27 @@
       color: white;
     }
 
+    .round-panel {
+      margin: 10px auto;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .round-button {
+      padding: 5px 10px;
+      border-radius: 5px;
+      background: #0077cc;
+      color: white;
+      cursor: pointer;
+    }
+
+    .round-button.active {
+      background: #005fa3;
+      font-weight: bold;
+    }
+
     select {
       margin-top: 10px;
       padding: 5px;
@@ -135,6 +156,14 @@
 <body>
   <h1>Curlingträning</h1>
 
+  <div>
+    <label for="startTeam">Välj lag som börjar: </label>
+    <select id="startTeam">
+      <option value="red">Röd</option>
+      <option value="yellow">Gul</option>
+    </select>
+  </div>
+
   <div id="clock">00:00.00</div>
   <button onclick="startPause()">Start/Paus</button>
   <button onclick="resetClock()">Återställ klocka</button>
@@ -143,9 +172,7 @@
 
   <h3 id="roundLabel">Runda 1</h3>
 
-  <select id="roundSelector" onchange="showRound()">
-    <option value="current">Nuvarande runda</option>
-  </select>
+  <div class="round-panel" id="roundPanel"></div>
 
   <div class="zone" id="shortZone">Kort zon</div>
   <div class="bo" id="bo">
@@ -170,7 +197,6 @@
   </table>
 
   <script>
-    // Stoppklocka
     let startTime = 0, elapsedTime = 0, timerInterval, running = false;
     function updateClock() {
       const time = Date.now() - startTime + elapsedTime;
@@ -198,47 +224,37 @@
       document.getElementById("clock").textContent = "00:00.00";
     }
 
-    // Speldata
     const bo = document.getElementById("bo");
+    const shortZone = document.getElementById("shortZone");
+    const longZone = document.getElementById("longZone");
     const redPanel = document.getElementById("redPanel");
     const yellowPanel = document.getElementById("yellowPanel");
     const tableBody = document.querySelector("#stoneTable tbody");
     const roundLabel = document.getElementById("roundLabel");
-    const roundSelector = document.getElementById("roundSelector");
-    const shortZone = document.getElementById("shortZone");
-    const longZone = document.getElementById("longZone");
+    const roundPanel = document.getElementById("roundPanel");
+    const startTeamSelect = document.getElementById("startTeam");
 
-    let stones = [];
-    let redCount = 0, yellowCount = 0;
-    const maxStones = 8;
-    let rounds = [];
-    let currentRound = 1;
+    let stones = [], redCount = 0, yellowCount = 0, maxStones = 8;
+    let rounds = [], currentRound = 1;
+    let turnColor = startTeamSelect.value;
 
     for (let i = 0; i < maxStones; i++) {
-      const r = document.createElement("div");
-      r.classList.add("mini-stone", "mini-red");
-      redPanel.appendChild(r);
-      const y = document.createElement("div");
-      y.classList.add("mini-stone", "mini-yellow");
-      yellowPanel.appendChild(y);
+      const r = document.createElement("div"); r.classList.add("mini-stone", "mini-red"); redPanel.appendChild(r);
+      const y = document.createElement("div"); y.classList.add("mini-stone", "mini-yellow"); yellowPanel.appendChild(y);
     }
 
-    function addStone(zone, x, y) {
-      let color;
-      if (redCount <= yellowCount && redCount < maxStones) {
-        color = "red";
-        redPanel.children[redCount++].classList.add("used");
-      } else if (yellowCount < maxStones) {
-        color = "yellow";
-        yellowPanel.children[yellowCount++].classList.add("used");
-      } else return alert("Alla stenar är använda!");
+    startTeamSelect.addEventListener("change", () => { turnColor = startTeamSelect.value; });
 
+    function addStone(zone, x, y) {
+      let color = turnColor;
+      if(color === "red") redCount++; else yellowCount++;
       const stone = document.createElement("div");
       stone.classList.add("stone", color);
       stone.style.left = x + "px";
       stone.style.top = y + "px";
       zone.appendChild(stone);
-      stones.push({ element: stone, color, zone });
+      stones.push({ element: stone, color, zoneId: zone.id });
+      turnColor = turnColor === "red" ? "yellow" : "red";
 
       const time = document.getElementById("clock").textContent;
       const row = document.createElement("tr");
@@ -248,9 +264,7 @@
 
     function clickHandler(e, zone) {
       const rect = zone.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      addStone(zone, x, y);
+      addStone(zone, e.clientX - rect.left, e.clientY - rect.top);
     }
 
     bo.addEventListener("click", e => clickHandler(e, bo));
@@ -267,39 +281,30 @@
     }
 
     function nextRound() {
-      rounds.push({
-        number: currentRound,
-        stones: stones.map(s => ({
-          color: s.color,
-          zone: s.zone.id,
-          left: s.element.style.left,
-          top: s.element.style.top
-        }))
-      });
-
-      const opt = document.createElement("option");
-      opt.value = currentRound;
-      opt.textContent = `Runda ${currentRound}`;
-      roundSelector.appendChild(opt);
+      // Spara stenen i denna runda (inkl kort/lång)
+      rounds.push({ number: currentRound, stones: stones.map(s => ({ ...s })) });
+      const btn = document.createElement("div");
+      btn.classList.add("round-button");
+      btn.textContent = `Runda ${currentRound}`;
+      btn.dataset.round = currentRound;
+      btn.addEventListener("click", () => showRound(btn.dataset.round));
+      roundPanel.appendChild(btn);
 
       currentRound++;
       roundLabel.textContent = `Runda ${currentRound}`;
       resetBo();
     }
 
-    function showRound() {
-      const value = roundSelector.value;
+    function showRound(roundNum) {
       resetBo();
-      if (value === "current") return;
-
-      const round = rounds.find(r => r.number == value);
-      if (!round) return;
+      const round = rounds.find(r => r.number == roundNum);
+      if(!round) return;
       round.stones.forEach(s => {
-        const zone = s.zone === "bo" ? bo : (s.zone === "shortZone" ? shortZone : longZone);
+        const zone = s.zoneId === "bo" ? bo : (s.zoneId === "shortZone" ? shortZone : longZone);
         const stone = document.createElement("div");
         stone.classList.add("stone", s.color);
-        stone.style.left = s.left;
-        stone.style.top = s.top;
+        stone.style.left = s.element.style.left;
+        stone.style.top = s.element.style.top;
         zone.appendChild(stone);
       });
     }
