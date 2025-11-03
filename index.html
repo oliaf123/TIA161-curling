@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="sv">
 <head>
-  <meta charset="UTF-8" />
-  <title>Curlingträning – Analysverktyg</title>
+  <meta charset="UTF-8">
+  <title>Curlingträning</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -24,14 +24,28 @@
       color: #222;
     }
 
+    .zone {
+      margin: 10px auto;
+      width: 500px;
+      height: 100px;
+      background: #cce6ff;
+      border: 2px dashed #0077cc;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #003366;
+      font-weight: bold;
+    }
+
     .bo {
       position: relative;
-      margin: 20px auto;
+      margin: 10px auto;
       width: 500px;
       height: 500px;
       border-radius: 50%;
       background: white;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 0 20px rgba(0,0,0,0.2);
       overflow: hidden;
     }
 
@@ -45,7 +59,7 @@
 
     .blue { width: 500px; height: 500px; background: #0077cc; }
     .white { width: 350px; height: 350px; background: #ffffff; }
-    .red { width: 200px; height: 200px; background: #cc0000; }
+    .red   { width: 200px; height: 200px; background: #cc0000; }
     .button { width: 100px; height: 100px; background: #ffffff; }
 
     .stone {
@@ -60,7 +74,9 @@
     .stone.red { background: red; }
     .stone.yellow { background: gold; }
 
-    .panel { margin-top: 20px; }
+    .panel {
+      margin-top: 20px;
+    }
 
     .mini-stone {
       width: 20px;
@@ -71,6 +87,7 @@
       border: 1px solid #000;
       opacity: 1;
     }
+
     .mini-stone.used { opacity: 0.2; }
     .mini-red { background: red; }
     .mini-yellow { background: gold; }
@@ -85,39 +102,59 @@
       background: #0077cc;
       color: white;
     }
-    button:hover { background: #005fa3; }
+
+    button:hover {
+      background: #005fa3;
+    }
 
     table {
       margin: 20px auto;
       border-collapse: collapse;
-      width: 80%;
+      width: 60%;
       background: white;
     }
+
     th, td {
-      border: 1px solid #999;
+      border: 1px solid #ccc;
       padding: 8px;
+      text-align: center;
     }
+
     th {
-      background: #003366;
+      background: #0077cc;
       color: white;
+    }
+
+    select {
+      margin-top: 10px;
+      padding: 5px;
+      border-radius: 5px;
     }
   </style>
 </head>
 <body>
-  <h1>Curlingträning – Analysverktyg</h1>
+  <h1>Curlingträning</h1>
 
   <div id="clock">00:00.00</div>
   <button onclick="startPause()">Start/Paus</button>
   <button onclick="resetClock()">Återställ klocka</button>
   <button onclick="resetBo()">Rensa bo</button>
-  <button onclick="exportData()">Exportera data (CSV)</button>
+  <button onclick="nextRound()">Nästa runda</button>
 
+  <h3 id="roundLabel">Runda 1</h3>
+
+  <select id="roundSelector" onchange="showRound()">
+    <option value="current">Nuvarande runda</option>
+  </select>
+
+  <div class="zone" id="shortZone">Kort zon</div>
   <div class="bo" id="bo">
     <div class="ring blue"></div>
     <div class="ring white"></div>
     <div class="ring red"></div>
     <div class="ring button"></div>
   </div>
+  <div class="zone" id="longZone">Lång zon</div>
 
   <div class="panel">
     <h3>Kvarvarande stenar</h3>
@@ -125,37 +162,24 @@
     <div id="yellowPanel"></div>
   </div>
 
-  <table id="dataTable">
+  <table id="stoneTable">
     <thead>
-      <tr>
-        <th>#</th>
-        <th>Lag</th>
-        <th>X-position</th>
-        <th>Y-position</th>
-        <th>Tid (sek)</th>
-      </tr>
+      <tr><th>Lag</th><th>Tid</th></tr>
     </thead>
     <tbody></tbody>
   </table>
 
   <script>
     // Stoppklocka
-    let startTime = 0;
-    let elapsedTime = 0;
-    let timerInterval;
-    let running = false;
-
+    let startTime = 0, elapsedTime = 0, timerInterval, running = false;
     function updateClock() {
       const time = Date.now() - startTime + elapsedTime;
       const minutes = Math.floor(time / 60000);
       const seconds = Math.floor((time % 60000) / 1000);
       const hundredths = Math.floor((time % 1000) / 10);
       document.getElementById("clock").textContent =
-        (minutes < 10 ? "0" : "") + minutes + ":" +
-        (seconds < 10 ? "0" : "") + seconds + "." +
-        (hundredths < 10 ? "0" : "") + hundredths;
+        `${minutes.toString().padStart(2,"0")}:${seconds.toString().padStart(2,"0")}.${hundredths.toString().padStart(2,"0")}`;
     }
-
     function startPause() {
       if (!running) {
         startTime = Date.now();
@@ -167,92 +191,117 @@
         running = false;
       }
     }
-
     function resetClock() {
       clearInterval(timerInterval);
-      startTime = 0;
-      elapsedTime = 0;
+      startTime = elapsedTime = 0;
       running = false;
       document.getElementById("clock").textContent = "00:00.00";
     }
 
-    // Curlingbo
+    // Speldata
     const bo = document.getElementById("bo");
     const redPanel = document.getElementById("redPanel");
     const yellowPanel = document.getElementById("yellowPanel");
-    const dataTable = document.getElementById("dataTable").querySelector("tbody");
+    const tableBody = document.querySelector("#stoneTable tbody");
+    const roundLabel = document.getElementById("roundLabel");
+    const roundSelector = document.getElementById("roundSelector");
+    const shortZone = document.getElementById("shortZone");
+    const longZone = document.getElementById("longZone");
 
     let stones = [];
-    let redCount = 0;
-    let yellowCount = 0;
+    let redCount = 0, yellowCount = 0;
     const maxStones = 8;
+    let rounds = [];
+    let currentRound = 1;
 
     for (let i = 0; i < maxStones; i++) {
       const r = document.createElement("div");
       r.classList.add("mini-stone", "mini-red");
       redPanel.appendChild(r);
-
       const y = document.createElement("div");
       y.classList.add("mini-stone", "mini-yellow");
       yellowPanel.appendChild(y);
     }
 
-    bo.addEventListener("click", e => {
-      const rect = bo.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
+    function addStone(zone, x, y) {
       let color;
       if (redCount <= yellowCount && redCount < maxStones) {
         color = "red";
-        redCount++;
-        redPanel.children[redCount - 1].classList.add("used");
+        redPanel.children[redCount++].classList.add("used");
       } else if (yellowCount < maxStones) {
         color = "yellow";
-        yellowCount++;
-        yellowPanel.children[yellowCount - 1].classList.add("used");
-      } else {
-        alert("Alla stenar är använda!");
-        return;
-      }
+        yellowPanel.children[yellowCount++].classList.add("used");
+      } else return alert("Alla stenar är använda!");
 
       const stone = document.createElement("div");
       stone.classList.add("stone", color);
       stone.style.left = x + "px";
       stone.style.top = y + "px";
+      zone.appendChild(stone);
+      stones.push({ element: stone, color, zone });
 
-      bo.appendChild(stone);
-      stones.push(stone);
-
-      const timeSec = ((elapsedTime + (running ? Date.now() - startTime : 0)) / 1000).toFixed(2);
-
+      const time = document.getElementById("clock").textContent;
       const row = document.createElement("tr");
-      row.innerHTML = `<td>${stones.length}</td><td>${color}</td><td>${x.toFixed(1)}</td><td>${y.toFixed(1)}</td><td>${timeSec}</td>`;
-      dataTable.appendChild(row);
-    });
-
-    function resetBo() {
-      stones.forEach(s => s.remove());
-      stones = [];
-      redCount = 0;
-      yellowCount = 0;
-      [...redPanel.children].forEach(c => c.classList.remove("used"));
-      [...yellowPanel.children].forEach(c => c.classList.remove("used"));
-      dataTable.innerHTML = "";
+      row.innerHTML = `<td>${color === "red" ? "Röd" : "Gul"}</td><td>${time}</td>`;
+      tableBody.appendChild(row);
     }
 
-    function exportData() {
-      let csv = "#;Lag;X;Y;Tid (sek)\n";
-      document.querySelectorAll("#dataTable tbody tr").forEach(row => {
-        const cols = [...row.children].map(td => td.innerText);
-        csv += cols.join(";") + "\n";
+    function clickHandler(e, zone) {
+      const rect = zone.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      addStone(zone, x, y);
+    }
+
+    bo.addEventListener("click", e => clickHandler(e, bo));
+    shortZone.addEventListener("click", e => clickHandler(e, shortZone));
+    longZone.addEventListener("click", e => clickHandler(e, longZone));
+
+    function resetBo() {
+      stones.forEach(s => s.element.remove());
+      stones = [];
+      redCount = yellowCount = 0;
+      [...redPanel.children].forEach(c => c.classList.remove("used"));
+      [...yellowPanel.children].forEach(c => c.classList.remove("used"));
+      tableBody.innerHTML = "";
+    }
+
+    function nextRound() {
+      rounds.push({
+        number: currentRound,
+        stones: stones.map(s => ({
+          color: s.color,
+          zone: s.zone.id,
+          left: s.element.style.left,
+          top: s.element.style.top
+        }))
       });
 
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "curlingdata.csv";
-      link.click();
+      const opt = document.createElement("option");
+      opt.value = currentRound;
+      opt.textContent = `Runda ${currentRound}`;
+      roundSelector.appendChild(opt);
+
+      currentRound++;
+      roundLabel.textContent = `Runda ${currentRound}`;
+      resetBo();
+    }
+
+    function showRound() {
+      const value = roundSelector.value;
+      resetBo();
+      if (value === "current") return;
+
+      const round = rounds.find(r => r.number == value);
+      if (!round) return;
+      round.stones.forEach(s => {
+        const zone = s.zone === "bo" ? bo : (s.zone === "shortZone" ? shortZone : longZone);
+        const stone = document.createElement("div");
+        stone.classList.add("stone", s.color);
+        stone.style.left = s.left;
+        stone.style.top = s.top;
+        zone.appendChild(stone);
+      });
     }
   </script>
 </body>
